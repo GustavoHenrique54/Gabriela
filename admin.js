@@ -49,6 +49,39 @@
   let isAdminLoggedIn = safeStorage.getItem(STORAGE_PREFIX + "logged_in") === "true";
   let isEditMode = false;
 
+  // Image compressor helper function
+  function compressImage(file, maxWidth, maxHeight, quality, callback) {
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      const img = new Image();
+      img.onload = function () {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        callback(dataUrl);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
   // Initialize
   document.addEventListener("DOMContentLoaded", () => {
     hideLoadingOverlay(); // Ensure any leftover loading overlay is removed early
@@ -96,6 +129,28 @@
   }
 
   function applySavedContent() {
+    // Apply saved global settings (Title and Favicon)
+    const savedGlobalTitle = safeStorage.getItem(STORAGE_PREFIX + "global_title");
+    if (savedGlobalTitle) {
+      const currentTitle = document.title;
+      if (currentTitle.includes("—")) {
+        const parts = currentTitle.split("—");
+        document.title = parts[0].trim() + " — " + savedGlobalTitle;
+      } else {
+        document.title = savedGlobalTitle;
+      }
+    }
+    const savedFavicon = safeStorage.getItem(STORAGE_PREFIX + "global_favicon");
+    if (savedFavicon) {
+      let favLink = document.querySelector("link[rel*='icon']");
+      if (!favLink) {
+        favLink = document.createElement("link");
+        favLink.rel = "icon";
+        document.head.appendChild(favLink);
+      }
+      favLink.href = savedFavicon;
+    }
+
     const pageKey = getPageKey();
     const savedTextData = safeStorage.getItem(pageKey);
     if (savedTextData) {
@@ -118,6 +173,22 @@
 
     if (window.location.pathname.endsWith("work.html") || window.location.pathname === "/" || window.location.pathname.endsWith("/")) {
       applySavedPaintings();
+      
+      // Restore saved paintings order
+      const savedOrderStr = safeStorage.getItem(STORAGE_PREFIX + "paintings_order");
+      if (savedOrderStr) {
+        const savedOrder = JSON.parse(savedOrderStr);
+        const grid = document.querySelector(".portfolio-grid");
+        if (grid) {
+          const items = Array.from(grid.querySelectorAll(".portfolio-item"));
+          savedOrder.forEach(href => {
+            const matchedItem = items.find(item => item.getAttribute("href") === href);
+            if (matchedItem) {
+              grid.appendChild(matchedItem);
+            }
+          });
+        }
+      }
     }
 
     if (window.location.pathname.endsWith("index.html") || window.location.pathname === "/" || window.location.pathname.endsWith("/")) {
@@ -175,6 +246,13 @@
     });
 
     let success = safeStorage.setItem(pageKey, JSON.stringify(textData));
+
+    if (window.location.pathname.endsWith("work.html")) {
+      const items = Array.from(document.querySelectorAll(".portfolio-item"));
+      const order = items.map(item => item.getAttribute("href"));
+      const orderSuccess = safeStorage.setItem(STORAGE_PREFIX + "paintings_order", JSON.stringify(order));
+      success = success && orderSuccess;
+    }
 
     if (window.location.pathname.endsWith("index.html") || window.location.pathname === "/" || window.location.pathname.endsWith("/")) {
       const videoBg = document.querySelector(".video-background");
@@ -459,12 +537,10 @@
     document.getElementById("adminImgFileInput").addEventListener("change", function(e) {
       const file = e.target.files[0];
       if (file) {
-        const reader = new FileReader();
-        reader.onload = function(evt) {
-          loadedBase64 = evt.target.result;
+        compressImage(file, 1200, 1200, 0.85, (compressedUrl) => {
+          loadedBase64 = compressedUrl;
           document.getElementById("adminImgUrlInput").value = "Upload carregado com sucesso!";
-        };
-        reader.readAsDataURL(file);
+        });
       }
     });
 
@@ -514,7 +590,26 @@
     const ghToken = safeStorage.getItem(STORAGE_PREFIX + "gh_token") || "";
     const ghBranch = safeStorage.getItem(STORAGE_PREFIX + "gh_branch") || "main";
 
+    // Load global values
+    const globalTitleVal = safeStorage.getItem(STORAGE_PREFIX + "global_title") || "Gabriela de Souza";
+    const globalFaviconVal = safeStorage.getItem(STORAGE_PREFIX + "global_favicon") || "https://images.squarespace-cdn.com/content/v1/591cce10bf629a201c743003/afc8b6f7-52ef-4afe-89b1-33ca5ddefca4/favicon.ico?format=100w";
+
     sidebar.innerHTML = `
+      <h3>Configurações Globais</h3>
+      
+      <div class="admin-setting-item">
+        <label>Título do Site (Aba)</label>
+        <input type="text" id="adminGlobalTitle" value="${globalTitleVal}">
+      </div>
+
+      <div class="admin-setting-item">
+        <label>URL do Favicon (.ico/.png)</label>
+        <input type="text" id="adminGlobalFavicon" value="${globalFaviconVal}">
+        <div style="text-align: center; color: #888; font-size: 11px; margin: 10px 0;">OU</div>
+        <label>Carregar Favicon Local</label>
+        <input type="file" id="adminGlobalFaviconFile" accept="image/*" style="border: 1px solid #3c3c3c; padding: 10px; width: 100%; color: #fff;">
+      </div>
+
       <h3>Credenciais GitHub (Vercel)</h3>
       
       <div class="admin-setting-item">
@@ -581,6 +676,48 @@
     `;
 
     document.body.appendChild(sidebar);
+
+    // Bind Global settings saving
+    const titleInput = document.getElementById("adminGlobalTitle");
+    titleInput.addEventListener("change", (e) => {
+      const val = e.target.value.trim();
+      safeStorage.setItem(STORAGE_PREFIX + "global_title", val);
+      const currentTitle = document.title;
+      if (currentTitle.includes("—")) {
+        const parts = currentTitle.split("—");
+        document.title = parts[0].trim() + " — " + val;
+      } else {
+        document.title = val;
+      }
+      saveCurrentPageContent();
+    });
+
+    const faviconInput = document.getElementById("adminGlobalFavicon");
+    const updateFavicon = (url) => {
+      safeStorage.setItem(STORAGE_PREFIX + "global_favicon", url);
+      let favLink = document.querySelector("link[rel*='icon']");
+      if (!favLink) {
+        favLink = document.createElement("link");
+        favLink.rel = "icon";
+        document.head.appendChild(favLink);
+      }
+      favLink.href = url;
+      saveCurrentPageContent();
+    };
+
+    faviconInput.addEventListener("change", (e) => {
+      updateFavicon(e.target.value.trim());
+    });
+
+    document.getElementById("adminGlobalFaviconFile").addEventListener("change", function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        compressImage(file, 64, 64, 0.9, (compressedUrl) => {
+          faviconInput.value = "Upload carregado com sucesso!";
+          updateFavicon(compressedUrl);
+        });
+      }
+    });
 
     // Bind GitHub settings saving
     document.getElementById("adminGhOwner").addEventListener("change", (e) => safeStorage.setItem(STORAGE_PREFIX + "gh_owner", e.target.value.trim()));
@@ -689,12 +826,10 @@
     document.getElementById("newArtImgFile").addEventListener("change", function(e) {
       const file = e.target.files[0];
       if (file) {
-        const reader = new FileReader();
-        reader.onload = function(evt) {
-          loadedBase64 = evt.target.result;
+        compressImage(file, 1200, 1200, 0.85, (compressedUrl) => {
+          loadedBase64 = compressedUrl;
           document.getElementById("newArtImgUrl").value = "Upload carregado com sucesso!";
-        };
-        reader.readAsDataURL(file);
+        });
       }
     });
 
@@ -782,7 +917,31 @@
       if (!actions && show) {
         actions = document.createElement("div");
         actions.className = "item-actions";
-        actions.innerHTML = `<button class="item-btn delete-btn">Excluir</button>`;
+        actions.innerHTML = `
+          <button class="item-btn move-btn move-prev" title="Mover para Esquerda/Cima">←</button>
+          <button class="item-btn delete-btn">Excluir</button>
+          <button class="item-btn move-btn move-next" title="Mover para Direita/Baixo">→</button>
+        `;
+        
+        actions.querySelector(".move-prev").addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const prev = item.previousElementSibling;
+          if (prev && prev.classList.contains("portfolio-item")) {
+            item.parentNode.insertBefore(item, prev);
+            saveCurrentPageContent();
+          }
+        });
+        
+        actions.querySelector(".move-next").addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const next = item.nextElementSibling;
+          if (next && next.classList.contains("portfolio-item")) {
+            item.parentNode.insertBefore(item, next.nextElementSibling);
+            saveCurrentPageContent();
+          }
+        });
         
         actions.querySelector(".delete-btn").addEventListener("click", (e) => {
           e.preventDefault();
@@ -796,6 +955,7 @@
             const updated = currentList.filter(p => p.url !== href);
             safeStorage.setItem(STORAGE_PREFIX + "custom_paintings", JSON.stringify(updated));
             safeStorage.removeItem(STORAGE_PREFIX + "content_" + href);
+            saveCurrentPageContent();
           }
         });
         item.appendChild(actions);
@@ -1318,12 +1478,10 @@
     document.getElementById("homeImageFile").addEventListener("change", function(e) {
       const file = e.target.files[0];
       if (file) {
-        const reader = new FileReader();
-        reader.onload = function(evt) {
-          loadedBgBase64 = evt.target.result;
+        compressImage(file, 1920, 1080, 0.85, (compressedUrl) => {
+          loadedBgBase64 = compressedUrl;
           document.getElementById("homeImageUrl").value = "Upload carregado com sucesso!";
-        };
-        reader.readAsDataURL(file);
+        });
       }
     });
 
@@ -1331,12 +1489,10 @@
     document.getElementById("homeLogoFile").addEventListener("change", function(e) {
       const file = e.target.files[0];
       if (file) {
-        const reader = new FileReader();
-        reader.onload = function(evt) {
-          loadedLogoBase64 = evt.target.result;
+        compressImage(file, 800, 800, 0.9, (compressedUrl) => {
+          loadedLogoBase64 = compressedUrl;
           document.getElementById("homeLogoUrl").value = "Upload carregado com sucesso!";
-        };
-        reader.readAsDataURL(file);
+        });
       }
     });
 

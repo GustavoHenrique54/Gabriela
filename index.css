@@ -583,6 +583,14 @@ body.admin-mode-active .portfolio-item:hover .item-actions {
   background: #3498db;
 }
 
+.item-btn.move-btn {
+  background: #3498db;
+}
+
+.item-btn.move-btn:hover {
+  background: #2980b9;
+}
+
 /* Admin top menu bar */
 .admin-topbar {
   background-color: #1e1e1e;
