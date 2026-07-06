@@ -1055,11 +1055,9 @@
     <div id="mobileNav">
       <nav class="main-nav">
         <ul>
-          <li><a href="index.html">Home</a></li>
-          <li><a href="work.html">work</a></li>
-          <li><a href="aboutruth.html">About</a></li>
-          <li><a href="cvpage.html">CV</a></li>
-          <li><a href="https://ruthsshoppe.store" target="_blank">shop</a></li>
+          <li><a href="index.html">home</a></li>
+          <li><a href="work.html">trabalhos</a></li>
+          <li><a href="aboutruth.html">sobre mim</a></li>
         </ul>
       </nav>
     </div>
@@ -1074,11 +1072,9 @@
       <div id="topNav">
         <nav class="main-nav">
           <ul>
-            <li><a href="index.html">Home</a></li>
-            <li><a href="work.html">work</a></li>
-            <li><a href="aboutruth.html">About</a></li>
-            <li><a href="cvpage.html">CV</a></li>
-            <li><a href="https://ruthsshoppe.store" target="_blank">shop</a></li>
+            <li><a href="index.html">home</a></li>
+            <li><a href="work.html">trabalhos</a></li>
+            <li><a href="aboutruth.html">sobre mim</a></li>
           </ul>
         </nav>
       </div>
