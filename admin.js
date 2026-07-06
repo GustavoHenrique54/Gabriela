@@ -955,6 +955,11 @@
     
     doc.querySelectorAll(".item-actions").forEach(a => a.remove());
 
+    // Re-add admin.js script so the editor button persists after save
+    const adminScript = doc.createElement("script");
+    adminScript.src = "admin.js";
+    doc.body.appendChild(adminScript);
+
     return "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
   }
 
@@ -1032,6 +1037,11 @@
         }
       });
     }
+
+    // Re-add admin.js script so the editor button persists
+    const adminScript = doc.createElement("script");
+    adminScript.src = "admin.js";
+    doc.body.appendChild(adminScript);
 
     return "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
   }
