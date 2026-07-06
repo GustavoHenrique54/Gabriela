@@ -85,11 +85,73 @@
     reader.readAsDataURL(file);
   }
 
+  // Reorder and sort helpers for work page (supports different desktop and mobile order)
+  function restoreOrderFromStorage() {
+    const dtOrderStr = safeStorage.getItem(STORAGE_PREFIX + "paintings_order_dt");
+    const mbOrderStr = safeStorage.getItem(STORAGE_PREFIX + "paintings_order_mb");
+    
+    if (dtOrderStr) {
+      const dtOrder = JSON.parse(dtOrderStr);
+      dtOrder.forEach((href, index) => {
+        const matched = document.querySelector(`.portfolio-item[href="${href}"]`);
+        if (matched) matched.setAttribute("data-order-dt", index + 1);
+      });
+    }
+    
+    if (mbOrderStr) {
+      const mbOrder = JSON.parse(mbOrderStr);
+      mbOrder.forEach((href, index) => {
+        const matched = document.querySelector(`.portfolio-item[href="${href}"]`);
+        if (matched) matched.setAttribute("data-order-mb", index + 1);
+      });
+    }
+  }
+
+  function initializeOrderAttributes() {
+    const items = document.querySelectorAll(".portfolio-item");
+    items.forEach((item, index) => {
+      if (!item.hasAttribute("data-order-dt")) {
+        item.setAttribute("data-order-dt", index + 1);
+      }
+      if (!item.hasAttribute("data-order-mb")) {
+        item.setAttribute("data-order-mb", index + 1);
+      }
+    });
+  }
+
+  let isSortingActive = false;
+  function sortPortfolioGrid() {
+    if (isSortingActive) return;
+    const grid = document.querySelector(".portfolio-grid");
+    if (!grid) return;
+    
+    isSortingActive = true;
+    const isMobile = window.innerWidth <= 900;
+    const items = Array.from(grid.querySelectorAll(".portfolio-item"));
+    
+    items.sort((a, b) => {
+      const ordA = parseInt(a.getAttribute(isMobile ? "data-order-mb" : "data-order-dt")) || 999;
+      const ordB = parseInt(b.getAttribute(isMobile ? "data-order-mb" : "data-order-dt")) || 999;
+      return ordA - ordB;
+    });
+    
+    items.forEach(item => grid.appendChild(item));
+    isSortingActive = false;
+  }
+
   // Initialize
   document.addEventListener("DOMContentLoaded", () => {
     hideLoadingOverlay(); // Ensure any leftover loading overlay is removed early
     applySavedDesign();
     applySavedContent();
+    
+    if (window.location.pathname.endsWith("work.html") || window.location.pathname === "/" || window.location.pathname.endsWith("/")) {
+      restoreOrderFromStorage();
+      initializeOrderAttributes();
+      sortPortfolioGrid();
+      window.addEventListener("resize", sortPortfolioGrid);
+    }
+    
     injectFloatingLock();
     
     if (isAdminLoggedIn) {

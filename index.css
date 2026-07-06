@@ -454,31 +454,41 @@ a:hover {
 
 @media (max-width: 640px) {
   #topNav {
-    display: none;
+    display: flex !important;
+    justify-content: center;
+    margin-top: 10px;
+  }
+
+  #topNav ul {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    gap: 30px;
+    padding: 0;
+  }
+
+  #topNav li:first-child {
+    display: none; /* Hide "home" link on mobile navigation since logo is home */
   }
 
   #mobileMenuLink {
-    display: block;
+    display: none !important;
   }
 
-  #mobileNav.open {
-    display: block;
+  #mobileNav {
+    display: none !important;
+  }
+
+  #header {
     margin-bottom: 20px;
   }
 
-  #mobileNav ul {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 15px;
-    padding: 10px 0;
-    background: #fbfbfb;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  .page-divider {
+    margin: 20px 0;
   }
 
-  #mobileNav a {
-    font-size: 16px;
-    color: var(--title-color);
+  #canvas {
+    padding: 20px 15px;
   }
 
   .portfolio-grid {
