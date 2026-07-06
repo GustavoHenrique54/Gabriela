@@ -51,10 +51,10 @@
 
   // Initialize
   document.addEventListener("DOMContentLoaded", () => {
+    hideLoadingOverlay(); // Ensure any leftover loading overlay is removed early
     applySavedDesign();
     applySavedContent();
     injectFloatingLock();
-    hideLoadingOverlay(); // Ensure any leftover loading overlay is removed
     
     if (isAdminLoggedIn) {
       activateAdminToolbar();
