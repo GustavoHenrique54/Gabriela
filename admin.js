@@ -120,6 +120,25 @@
       applySavedPaintings();
     }
 
+    if (window.location.pathname.endsWith("index.html") || window.location.pathname === "/" || window.location.pathname.endsWith("/")) {
+      const landingDataStr = safeStorage.getItem(STORAGE_PREFIX + "landing_config");
+      if (landingDataStr) {
+        const landingData = JSON.parse(landingDataStr);
+        const videoBg = document.querySelector(".video-background");
+        const imageBg = document.querySelector(".image-background");
+        const enterBtn = document.querySelector(".enter-site-btn");
+        const enterLink = enterBtn ? enterBtn.closest("a") : null;
+        const instaLink = document.querySelector(".landing-instagram a");
+
+        if (videoBg && landingData.videoDisplay !== undefined) videoBg.style.display = landingData.videoDisplay;
+        if (videoBg && landingData.videoSrc) videoBg.src = landingData.videoSrc;
+        if (imageBg && landingData.imageDisplay !== undefined) imageBg.style.display = landingData.imageDisplay;
+        if (imageBg && landingData.imageSrc) imageBg.src = landingData.imageSrc;
+        if (enterLink && landingData.enterHref) enterLink.setAttribute("href", landingData.enterHref);
+        if (instaLink && landingData.instaHref) instaLink.setAttribute("href", landingData.instaHref);
+      }
+    }
+
     const savedImagesData = safeStorage.getItem(STORAGE_PREFIX + "images");
     if (savedImagesData) {
       const imgs = JSON.parse(savedImagesData);
@@ -144,7 +163,8 @@
 
     const textSelectors = [
       "h1.logo a", "h2", "p", "figcaption", "span", "li a",
-      ".portfolio-title", ".image-caption", ".cv-year", ".cv-item div"
+      ".portfolio-title", ".image-caption", ".cv-year", ".cv-item div",
+      ".enter-site-btn"
     ];
 
     textSelectors.forEach(selector => {
@@ -154,7 +174,27 @@
       }
     });
 
-    const success = safeStorage.setItem(pageKey, JSON.stringify(textData));
+    let success = safeStorage.setItem(pageKey, JSON.stringify(textData));
+
+    if (window.location.pathname.endsWith("index.html") || window.location.pathname === "/" || window.location.pathname.endsWith("/")) {
+      const videoBg = document.querySelector(".video-background");
+      const imageBg = document.querySelector(".image-background");
+      const enterBtn = document.querySelector(".enter-site-btn");
+      const enterLink = enterBtn ? enterBtn.closest("a") : null;
+      const instaLink = document.querySelector(".landing-instagram a");
+
+      const landingData = {
+        videoDisplay: videoBg ? videoBg.style.display : "",
+        videoSrc: videoBg ? videoBg.src : "",
+        imageDisplay: imageBg ? imageBg.style.display : "",
+        imageSrc: imageBg ? imageBg.src : "",
+        enterHref: enterLink ? enterLink.getAttribute("href") : "",
+        instaHref: instaLink ? instaLink.getAttribute("href") : ""
+      };
+      const landingSuccess = safeStorage.setItem(STORAGE_PREFIX + "landing_config", JSON.stringify(landingData));
+      success = success && landingSuccess;
+    }
+
     if (!success && isEditMode) {
       showStorageWarning();
     }
@@ -288,11 +328,15 @@
     toolbar.className = "admin-topbar";
     
     const isWorkPage = window.location.pathname.endsWith("work.html");
+    const isHomePage = window.location.pathname.endsWith("index.html") || window.location.pathname === "/" || window.location.pathname.endsWith("/");
+    
     const addPaintingBtnHtml = isWorkPage ? `<button id="adminAddPaintingBtn">Adicionar Obra</button>` : '';
+    const homeBtnHtml = isHomePage ? `<button id="adminHomeConfigBtn">Personalizar Tela Inicial</button>` : '';
 
     toolbar.innerHTML = `
       <h4><span>●</span> Editor Gabriela de Souza</h4>
       <div class="btn-group">
+        ${homeBtnHtml}
         ${addPaintingBtnHtml}
         <button id="adminDesignBtn">Personalizar Cores/Fontes</button>
         <button class="accent-btn" id="adminSaveGhBtn">Salvar no GitHub</button>
@@ -309,6 +353,9 @@
     
     if (isWorkPage) {
       document.getElementById("adminAddPaintingBtn").addEventListener("click", showAddPaintingModal);
+    }
+    if (isHomePage) {
+      document.getElementById("adminHomeConfigBtn").addEventListener("click", showHomeConfigModal);
     }
   }
 
@@ -340,7 +387,8 @@
   function makeTextsEditable(enable) {
     const textSelectors = [
       "h2", "p", "figcaption", "span", 
-      ".portfolio-title", ".image-caption", ".cv-year", ".cv-item div"
+      ".portfolio-title", ".image-caption", ".cv-year", ".cv-item div",
+      ".enter-site-btn"
     ];
     
     textSelectors.forEach(selector => {
@@ -357,7 +405,7 @@
 
   function makeImagesClickable(enable) {
     const imageSelectors = [
-      ".column-image img", ".portfolio-item img", "#logo img"
+      ".column-image img", ".portfolio-item img", "#logo img", ".landing-logo img", ".image-background"
     ];
 
     imageSelectors.forEach(selector => {
@@ -1164,6 +1212,194 @@
     const g = parseInt(parts[1]).toString(16).padStart(2, '0');
     const b = parseInt(parts[2]).toString(16).padStart(2, '0');
     return `#${r}${g}${b}`;
+  }
+
+  function showHomeConfigModal() {
+    removeModals();
+    
+    // Get current values from DOM
+    const videoBg = document.querySelector(".video-background");
+    const imageBg = document.querySelector(".image-background");
+    const logoImg = document.querySelector(".landing-logo img");
+    const enterBtn = document.querySelector(".enter-site-btn");
+    const enterLink = enterBtn ? enterBtn.closest("a") : null;
+    const instaLink = document.querySelector(".landing-instagram a");
+
+    const isVideoActive = videoBg && videoBg.style.display !== "none";
+    
+    let currentVideoSrc = videoBg ? videoBg.src : "";
+    let currentVideoId = "";
+    if (currentVideoSrc) {
+      const match = currentVideoSrc.match(/\/embed\/([^?#]+)/);
+      if (match) currentVideoId = match[1];
+    }
+    
+    const currentImageSrc = imageBg ? imageBg.src : "";
+    const currentLogoSrc = logoImg ? logoImg.src : "";
+    const currentBtnText = enterBtn ? enterBtn.innerHTML : "ENTER SITE";
+    const currentBtnHref = enterLink ? enterLink.getAttribute("href") : "work.html";
+    const currentInstaHref = instaLink ? instaLink.getAttribute("href") : "http://instagram.com/septemberwildflowers";
+
+    const backdrop = document.createElement("div");
+    backdrop.className = "admin-modal-backdrop";
+    backdrop.id = "adminHomeConfigModal";
+    backdrop.innerHTML = `
+      <div class="admin-modal" style="max-width: 580px;">
+        <div class="admin-modal-header">
+          <h3>Personalizar Tela Inicial</h3>
+          <span style="cursor:pointer; font-size: 20px;" onclick="document.getElementById('adminHomeConfigModal').remove()">&times;</span>
+        </div>
+        <div class="admin-modal-body" style="max-height: 450px; overflow-y: auto;">
+          <div class="admin-setting-item">
+            <label>Tipo de Fundo</label>
+            <select id="homeBgType" style="border: 1px solid #3c3c3c; background-color: #3c3c3c; color: #fff; border-radius: 4px; padding: 10px; font-size: 13px; width: 100%;">
+              <option value="video" ${isVideoActive ? "selected" : ""}>Vídeo do YouTube</option>
+              <option value="image" ${!isVideoActive ? "selected" : ""}>Imagem</option>
+            </select>
+          </div>
+
+          <div id="homeVideoConfig" class="admin-setting-item" style="display: ${isVideoActive ? "block" : "none"};">
+            <label>Link ou ID do Vídeo do YouTube</label>
+            <input type="text" id="homeVideoUrl" value="${currentVideoId}" placeholder="Ex: JWuQmvjWVug ou link completo...">
+          </div>
+
+          <div id="homeImageConfig" class="admin-setting-item" style="display: ${!isVideoActive ? "block" : "none"};">
+            <label>URL da Imagem de Fundo</label>
+            <input type="text" id="homeImageUrl" value="${currentImageSrc}">
+            <div style="text-align: center; color: #888; font-size: 11px; margin: 10px 0;">OU</div>
+            <label>Carregar Arquivo de Fundo</label>
+            <input type="file" id="homeImageFile" accept="image/*" style="border: 1px solid #3c3c3c; padding: 10px; width: 100%; color: #fff;">
+          </div>
+
+          <hr style="border-color: #3c3c3c; margin: 20px 0;">
+
+          <div class="admin-setting-item">
+            <label>URL do Logo Central</label>
+            <input type="text" id="homeLogoUrl" value="${currentLogoSrc}">
+            <div style="text-align: center; color: #888; font-size: 11px; margin: 10px 0;">OU</div>
+            <label>Carregar Arquivo do Logo</label>
+            <input type="file" id="homeLogoFile" accept="image/*" style="border: 1px solid #3c3c3c; padding: 10px; width: 100%; color: #fff;">
+          </div>
+
+          <hr style="border-color: #3c3c3c; margin: 20px 0;">
+
+          <div class="admin-setting-item">
+            <label>Texto do Botão</label>
+            <input type="text" id="homeBtnText" value="${currentBtnText}">
+          </div>
+          <div class="admin-setting-item">
+            <label>Link de Destino do Botão</label>
+            <input type="text" id="homeBtnHref" value="${currentBtnHref}" placeholder="Ex: work.html">
+          </div>
+
+          <div class="admin-setting-item">
+            <label>Link do Instagram no Rodapé</label>
+            <input type="text" id="homeInstaHref" value="${currentInstaHref}" placeholder="Ex: http://instagram.com/...">
+          </div>
+        </div>
+        <div class="admin-modal-footer">
+          <button onclick="document.getElementById('adminHomeConfigModal').remove()">Cancelar</button>
+          <button class="primary-btn" id="homeConfigSubmit">Salvar Alterações</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(backdrop);
+    setTimeout(() => backdrop.classList.add("open"), 10);
+
+    const selectType = document.getElementById("homeBgType");
+    selectType.addEventListener("change", (e) => {
+      const type = e.target.value;
+      document.getElementById("homeVideoConfig").style.display = type === "video" ? "block" : "none";
+      document.getElementById("homeImageConfig").style.display = type === "image" ? "block" : "none";
+    });
+
+    let loadedBgBase64 = "";
+    document.getElementById("homeImageFile").addEventListener("change", function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          loadedBgBase64 = evt.target.result;
+          document.getElementById("homeImageUrl").value = "Upload carregado com sucesso!";
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    let loadedLogoBase64 = "";
+    document.getElementById("homeLogoFile").addEventListener("change", function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          loadedLogoBase64 = evt.target.result;
+          document.getElementById("homeLogoUrl").value = "Upload carregado com sucesso!";
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    document.getElementById("homeConfigSubmit").addEventListener("click", () => {
+      const type = selectType.value;
+
+      if (type === "video") {
+        let inputVideo = document.getElementById("homeVideoUrl").value.trim();
+        let videoId = inputVideo;
+        if (inputVideo.includes("youtube.com") || inputVideo.includes("youtu.be")) {
+          const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+          const match = inputVideo.match(regExp);
+          if (match && match[2].length === 11) {
+            videoId = match[2];
+          }
+        }
+        if (videoId && videoBg) {
+          videoBg.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&controls=0&showinfo=0&rel=0&iv_load_policy=3&playsinline=1&enablejsapi=1`;
+          videoBg.style.display = "block";
+        }
+        if (imageBg) imageBg.style.display = "none";
+      } else {
+        const urlInput = document.getElementById("homeImageUrl").value;
+        const finalBg = loadedBgBase64 || urlInput;
+        if (finalBg && finalBg !== "Upload carregado com sucesso!" && imageBg) {
+          imageBg.src = finalBg;
+          imageBg.style.display = "block";
+          
+          const savedImages = JSON.parse(safeStorage.getItem(STORAGE_PREFIX + "images") || "{}");
+          savedImages[".image-background"] = finalBg;
+          safeStorage.setItem(STORAGE_PREFIX + "images", JSON.stringify(savedImages));
+        }
+        if (videoBg) videoBg.style.display = "none";
+      }
+
+      const logoUrlInput = document.getElementById("homeLogoUrl").value;
+      const finalLogo = loadedLogoBase64 || logoUrlInput;
+      if (finalLogo && finalLogo !== "Upload carregado com sucesso!" && logoImg) {
+        logoImg.src = finalLogo;
+        const savedImages = JSON.parse(safeStorage.getItem(STORAGE_PREFIX + "images") || "{}");
+        savedImages[".landing-logo img"] = finalLogo;
+        safeStorage.setItem(STORAGE_PREFIX + "images", JSON.stringify(savedImages));
+      }
+
+      const btnTextVal = document.getElementById("homeBtnText").value;
+      if (enterBtn && btnTextVal) {
+        enterBtn.innerHTML = btnTextVal;
+      }
+      const btnHrefVal = document.getElementById("homeBtnHref").value.trim();
+      if (enterLink && btnHrefVal) {
+        enterLink.setAttribute("href", btnHrefVal);
+      }
+
+      const instaHrefVal = document.getElementById("homeInstaHref").value.trim();
+      if (instaLink && instaHrefVal) {
+        instaLink.setAttribute("href", instaHrefVal);
+      }
+
+      saveCurrentPageContent();
+
+      backdrop.remove();
+      alert("Alterações salvas na tela! Lembre-se de clicar em 'Salvar no GitHub' para enviar as atualizações.");
+    });
   }
 
   function logout() {
