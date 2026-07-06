@@ -51,6 +51,7 @@
 
   // Image compressor helper function
   function compressImage(file, maxWidth, maxHeight, quality, callback) {
+    const isPng = file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
     const reader = new FileReader();
     reader.onload = function (e) {
       const img = new Image();
@@ -72,9 +73,11 @@
         canvas.height = height;
 
         const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, width, height); // Support transparency
         ctx.drawImage(img, 0, 0, width, height);
 
-        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        const mimeType = isPng ? "image/png" : "image/jpeg";
+        const dataUrl = isPng ? canvas.toDataURL(mimeType) : canvas.toDataURL(mimeType, quality);
         callback(dataUrl);
       };
       img.src = e.target.result;
