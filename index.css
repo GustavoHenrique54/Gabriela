@@ -1,6 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Bellefair&family=Montserrat:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Lora:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500;600&family=Outfit:wght@300;400;500;600&display=swap');
-
-/* CSS Variables for Dynamic Customization */
+/* Customized variables definitions */
 :root {
   --bg-color: #fcfcfc;
   --text-color: #575757;
@@ -9,6 +7,10 @@
   --font-sans: 'Montserrat', sans-serif;
   --grid-gap: 80px;
 }
+@import url('https://fonts.googleapis.com/css2?family=Bellefair&family=Montserrat:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Lora:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500;600&family=Outfit:wght@300;400;500;600&display=swap');
+
+/* CSS Variables for Dynamic Customization */
+
 
 /* Global Reset */
 * {
