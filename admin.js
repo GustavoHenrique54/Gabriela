@@ -534,10 +534,10 @@
     document.body.appendChild(sidebar);
 
     // Bind GitHub settings saving
-    document.getElementById("adminGhOwner").addEventListener("change", (e) => safeStorage.setItem(STORAGE_PREFIX + "gh_owner", e.target.value));
-    document.getElementById("adminGhRepo").addEventListener("change", (e) => safeStorage.setItem(STORAGE_PREFIX + "gh_repo", e.target.value));
-    document.getElementById("adminGhToken").addEventListener("change", (e) => safeStorage.setItem(STORAGE_PREFIX + "gh_token", e.target.value));
-    document.getElementById("adminGhBranch").addEventListener("change", (e) => safeStorage.setItem(STORAGE_PREFIX + "gh_branch", e.target.value));
+    document.getElementById("adminGhOwner").addEventListener("change", (e) => safeStorage.setItem(STORAGE_PREFIX + "gh_owner", e.target.value.trim()));
+    document.getElementById("adminGhRepo").addEventListener("change", (e) => safeStorage.setItem(STORAGE_PREFIX + "gh_repo", e.target.value.trim()));
+    document.getElementById("adminGhToken").addEventListener("change", (e) => safeStorage.setItem(STORAGE_PREFIX + "gh_token", e.target.value.trim()));
+    document.getElementById("adminGhBranch").addEventListener("change", (e) => safeStorage.setItem(STORAGE_PREFIX + "gh_branch", e.target.value.trim()));
 
     // Bind Design settings saving
     document.getElementById("adminColorBg").addEventListener("input", (e) => saveDesignVariable("--bg-color", e.target.value));
@@ -759,12 +759,32 @@
   }
 
   // 7. GitHub Sync Implementation
+  // Helper to fetch with timeout
+  async function fetchWithTimeout(resource, options = {}) {
+    const { timeout = 15000 } = options; // 15 seconds timeout
+    
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    
+    try {
+      const response = await fetch(resource, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(id);
+      return response;
+    } catch (error) {
+      clearTimeout(id);
+      throw error;
+    }
+  }
+
   async function saveSiteToGitHub() {
     // 1. Validate GitHub Configs
-    const owner = safeStorage.getItem(STORAGE_PREFIX + "gh_owner");
-    const repo = safeStorage.getItem(STORAGE_PREFIX + "gh_repo");
-    const token = safeStorage.getItem(STORAGE_PREFIX + "gh_token");
-    const branch = safeStorage.getItem(STORAGE_PREFIX + "gh_branch") || "main";
+    const owner = (safeStorage.getItem(STORAGE_PREFIX + "gh_owner") || "").trim();
+    const repo = (safeStorage.getItem(STORAGE_PREFIX + "gh_repo") || "").trim();
+    const token = (safeStorage.getItem(STORAGE_PREFIX + "gh_token") || "").trim();
+    const branch = (safeStorage.getItem(STORAGE_PREFIX + "gh_branch") || "main").trim();
 
     if (!owner || !repo || !token) {
       alert("Por favor, abra 'Personalizar Cores/Fontes' e configure os dados de Usuário, Repositório e Token (PAT) do GitHub primeiro.");
@@ -805,27 +825,32 @@
       }
     } catch (err) {
       hideLoadingOverlay();
-      alert(`Falha no envio: ${err.message}. Verifique o token e as permissões de gravação.`);
+      let errorMsg = err.message;
+      if (err.name === 'AbortError') {
+        errorMsg = "Tempo limite esgotado (timeout). O GitHub demorou muito para responder.";
+      }
+      alert(`Falha no envio: ${errorMsg}. Verifique o token, as permissões de gravação e sua conexão de internet.`);
       toggleEditMode(true);
     }
   }
 
   async function commitFileToGitHub(path, content, message) {
-    const owner = safeStorage.getItem(STORAGE_PREFIX + "gh_owner");
-    const repo = safeStorage.getItem(STORAGE_PREFIX + "gh_repo");
-    const token = safeStorage.getItem(STORAGE_PREFIX + "gh_token");
-    const branch = safeStorage.getItem(STORAGE_PREFIX + "gh_branch") || "main";
+    const owner = (safeStorage.getItem(STORAGE_PREFIX + "gh_owner") || "").trim();
+    const repo = (safeStorage.getItem(STORAGE_PREFIX + "gh_repo") || "").trim();
+    const token = (safeStorage.getItem(STORAGE_PREFIX + "gh_token") || "").trim();
+    const branch = (safeStorage.getItem(STORAGE_PREFIX + "gh_branch") || "main").trim();
 
     const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
     
     // 1. Fetch current file SHA
     let sha = null;
     try {
-      const res = await fetch(url + `?ref=${branch}`, {
+      const res = await fetchWithTimeout(url + `?ref=${branch}`, {
         headers: {
           "Authorization": `token ${token}`,
           "Accept": "application/vnd.github.v3+json"
-        }
+        },
+        timeout: 15000
       });
       if (res.ok) {
         const data = await res.json();
@@ -833,6 +858,9 @@
       }
     } catch (e) {
       // File doesn't exist yet, we will create it (sha remains null)
+      if (e.name === 'AbortError') {
+        throw e;
+      }
     }
 
     // 2. Put file contents (base64 encoded)
@@ -848,14 +876,15 @@
       payload.sha = sha;
     }
 
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       method: "PUT",
       headers: {
         "Authorization": `token ${token}`,
         "Content-Type": "application/json",
         "Accept": "application/vnd.github.v3+json"
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      timeout: 15000
     });
 
     if (res.ok) {
