@@ -221,6 +221,7 @@
     if (savedTextData) {
       const texts = JSON.parse(savedTextData);
       Object.keys(texts).forEach(selector => {
+        if (selector === ".portfolio-title") return; // Skip portfolio titles, handled by href below
         const elements = document.querySelectorAll(selector);
         if (elements.length > 0 && texts[selector]) {
           if (Array.isArray(texts[selector])) {
@@ -239,21 +240,23 @@
     if (window.location.pathname.endsWith("work.html") || window.location.pathname === "/" || window.location.pathname.endsWith("/")) {
       applySavedPaintings();
       
-      // Restore saved paintings order
-      const savedOrderStr = safeStorage.getItem(STORAGE_PREFIX + "paintings_order");
-      if (savedOrderStr) {
-        const savedOrder = JSON.parse(savedOrderStr);
-        const grid = document.querySelector(".portfolio-grid");
-        if (grid) {
-          const items = Array.from(grid.querySelectorAll(".portfolio-item"));
-          savedOrder.forEach(href => {
-            const matchedItem = items.find(item => item.getAttribute("href") === href);
-            if (matchedItem) {
-              grid.appendChild(matchedItem);
-            }
-          });
-        }
+      // Restore portfolio titles by href
+      const titleMapStr = safeStorage.getItem(STORAGE_PREFIX + "portfolio_titles");
+      if (titleMapStr) {
+        const titleMap = JSON.parse(titleMapStr);
+        document.querySelectorAll(".portfolio-item").forEach(item => {
+          const href = item.getAttribute("href");
+          const titleEl = item.querySelector(".portfolio-title");
+          if (href && titleEl && titleMap[href] !== undefined) {
+            titleEl.innerHTML = titleMap[href];
+          }
+        });
       }
+      
+      // Restore saved paintings order and sort
+      restoreOrderFromStorage();
+      initializeOrderAttributes();
+      sortPortfolioGrid();
     }
 
     if (window.location.pathname.endsWith("index.html") || window.location.pathname === "/" || window.location.pathname.endsWith("/")) {
@@ -299,7 +302,7 @@
 
     const textSelectors = [
       "h1.logo a", "h2", "p", "figcaption", "span", "li a",
-      ".portfolio-title", ".image-caption", ".cv-year", ".cv-item div",
+      ".image-caption", ".cv-year", ".cv-item div",
       ".enter-site-btn"
     ];
 
@@ -312,11 +315,36 @@
 
     let success = safeStorage.setItem(pageKey, JSON.stringify(textData));
 
-    if (window.location.pathname.endsWith("work.html")) {
+    if (window.location.pathname.endsWith("work.html") || window.location.pathname === "/" || window.location.pathname.endsWith("/")) {
+      // Save portfolio titles keyed by href to avoid swap on reordering
+      const titleMap = {};
+      document.querySelectorAll(".portfolio-item").forEach(item => {
+        const href = item.getAttribute("href");
+        const titleEl = item.querySelector(".portfolio-title");
+        if (href && titleEl) {
+          titleMap[href] = titleEl.innerHTML;
+        }
+      });
+      safeStorage.setItem(STORAGE_PREFIX + "portfolio_titles", JSON.stringify(titleMap));
+
+      // Save desktop and mobile orders
       const items = Array.from(document.querySelectorAll(".portfolio-item"));
-      const order = items.map(item => item.getAttribute("href"));
-      const orderSuccess = safeStorage.setItem(STORAGE_PREFIX + "paintings_order", JSON.stringify(order));
-      success = success && orderSuccess;
+      const isMobile = window.innerWidth <= 900;
+      
+      items.forEach((el, index) => {
+        el.setAttribute(isMobile ? "data-order-mb" : "data-order-dt", index + 1);
+      });
+      
+      const dtOrder = items.map(el => ({ href: el.getAttribute("href"), val: parseInt(el.getAttribute("data-order-dt")) || 999 }));
+      const mbOrder = items.map(el => ({ href: el.getAttribute("href"), val: parseInt(el.getAttribute("data-order-mb")) || 999 }));
+      
+      dtOrder.sort((a, b) => a.val - b.val);
+      mbOrder.sort((a, b) => a.val - b.val);
+      
+      const orderSuccessDt = safeStorage.setItem(STORAGE_PREFIX + "paintings_order_dt", JSON.stringify(dtOrder.map(x => x.href)));
+      const orderSuccessMb = safeStorage.setItem(STORAGE_PREFIX + "paintings_order_mb", JSON.stringify(mbOrder.map(x => x.href)));
+      
+      success = success && orderSuccessDt && orderSuccessMb;
     }
 
     if (window.location.pathname.endsWith("index.html") || window.location.pathname === "/" || window.location.pathname.endsWith("/")) {
