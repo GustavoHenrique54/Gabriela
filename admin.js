@@ -259,22 +259,47 @@
       sortPortfolioGrid();
     }
 
-    if (window.location.pathname.endsWith("index.html") || window.location.pathname === "/" || window.location.pathname.endsWith("/")) {
-      const landingDataStr = safeStorage.getItem(STORAGE_PREFIX + "landing_config");
-      if (landingDataStr) {
-        const landingData = JSON.parse(landingDataStr);
+    const landingDataStr = safeStorage.getItem(STORAGE_PREFIX + "landing_config");
+    let hasAppliedInsta = false;
+
+    if (landingDataStr) {
+      const landingData = JSON.parse(landingDataStr);
+      if (window.location.pathname.endsWith("index.html") || window.location.pathname === "/" || window.location.pathname.endsWith("/")) {
         const videoBg = document.querySelector(".video-background");
         const imageBg = document.querySelector(".image-background");
         const enterBtn = document.querySelector(".enter-site-btn");
         const enterLink = enterBtn ? enterBtn.closest("a") : null;
-        const instaLink = document.querySelector(".landing-instagram a");
 
         if (videoBg && landingData.videoDisplay !== undefined) videoBg.style.display = landingData.videoDisplay;
         if (videoBg && landingData.videoSrc) videoBg.src = landingData.videoSrc;
         if (imageBg && landingData.imageDisplay !== undefined) imageBg.style.display = landingData.imageDisplay;
         if (imageBg && landingData.imageSrc) imageBg.src = landingData.imageSrc;
         if (enterLink && landingData.enterHref) enterLink.setAttribute("href", landingData.enterHref);
-        if (instaLink && landingData.instaHref) instaLink.setAttribute("href", landingData.instaHref);
+      }
+
+      const instaLink = document.querySelector(".landing-instagram a, .social-links a");
+      if (instaLink && landingData.instaHref) {
+        instaLink.setAttribute("href", landingData.instaHref);
+        hasAppliedInsta = true;
+      }
+    }
+
+    // Normal visitors fallback (or if not in local storage): fetch index.html dynamically to grab the updated Instagram link!
+    if (!hasAppliedInsta && !(window.location.pathname.endsWith("index.html") || window.location.pathname === "/" || window.location.pathname.endsWith("/"))) {
+      const instaLink = document.querySelector(".landing-instagram a, .social-links a");
+      if (instaLink) {
+        fetch("index.html")
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, "text/html");
+            const homeInsta = doc.querySelector(".landing-instagram a, .social-links a");
+            if (homeInsta) {
+              const href = homeInsta.getAttribute("href");
+              if (href) instaLink.setAttribute("href", href);
+            }
+          })
+          .catch(err => console.error("Erro ao carregar o link do Instagram:", err));
       }
     }
 
@@ -352,7 +377,7 @@
       const imageBg = document.querySelector(".image-background");
       const enterBtn = document.querySelector(".enter-site-btn");
       const enterLink = enterBtn ? enterBtn.closest("a") : null;
-      const instaLink = document.querySelector(".landing-instagram a");
+      const instaLink = document.querySelector(".landing-instagram a, .social-links a");
 
       const landingData = {
         videoDisplay: videoBg ? videoBg.style.display : "",
@@ -1476,7 +1501,7 @@
     const logoImg = document.querySelector(".landing-logo img");
     const enterBtn = document.querySelector(".enter-site-btn");
     const enterLink = enterBtn ? enterBtn.closest("a") : null;
-    const instaLink = document.querySelector(".landing-instagram a");
+    const instaLink = document.querySelector(".landing-instagram a, .social-links a");
 
     const isVideoActive = videoBg && videoBg.style.display !== "none";
     
