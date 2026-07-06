@@ -942,6 +942,7 @@
     const toolbar = doc.getElementById("adminToolbar"); if (toolbar) toolbar.remove();
     const lockBtn = doc.getElementById("adminLockBtn"); if (lockBtn) lockBtn.remove();
     const sidebar = doc.getElementById("adminSidebar"); if (sidebar) sidebar.remove();
+    const loadingOverlay = doc.getElementById("adminLoadingOverlay"); if (loadingOverlay) loadingOverlay.remove();
     
     doc.querySelectorAll(".admin-modal-backdrop").forEach(m => m.remove());
     doc.querySelectorAll("script[src='admin.js']").forEach(s => s.remove());
@@ -964,6 +965,7 @@
     const toolbar = doc.getElementById("adminToolbar"); if (toolbar) toolbar.remove();
     const lockBtn = doc.getElementById("adminLockBtn"); if (lockBtn) lockBtn.remove();
     const sidebar = doc.getElementById("adminSidebar"); if (sidebar) sidebar.remove();
+    const loadingOverlay = doc.getElementById("adminLoadingOverlay"); if (loadingOverlay) loadingOverlay.remove();
 
     const styleTag = doc.createElement("style");
     let cssVars = "";
