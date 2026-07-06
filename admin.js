@@ -54,6 +54,7 @@
     applySavedDesign();
     applySavedContent();
     injectFloatingLock();
+    hideLoadingOverlay(); // Ensure any leftover loading overlay is removed
     
     if (isAdminLoggedIn) {
       activateAdminToolbar();
