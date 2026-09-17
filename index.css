@@ -876,3 +876,106 @@ body.admin-mode-active .portfolio-item:hover .item-actions {
 .admin-modal-footer button.primary-btn:hover {
   background-color: #2980b9;
 }
+
+/* Artwork Description & Paragraph Styles */
+.artwork-description {
+  margin-top: 25px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding-top: 20px;
+}
+
+.artwork-description p,
+.artwork-desc-p {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--text-color);
+  margin-bottom: 18px;
+  position: relative;
+  word-wrap: break-word;
+  transition: background-color 0.2s, outline-color 0.2s;
+}
+
+.artwork-description p:last-child,
+.artwork-desc-p:last-child {
+  margin-bottom: 0;
+}
+
+/* Admin Paragraph Controls (Active in Edit Mode) */
+.admin-desc-actions {
+  margin-top: 20px;
+  display: none;
+}
+
+body.admin-mode-active .admin-desc-actions {
+  display: block;
+}
+
+.admin-inline-btn {
+  background: transparent;
+  border: 1px dashed #3498db;
+  color: #3498db;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-inline-btn:hover {
+  background: rgba(52, 152, 219, 0.1);
+  border-style: solid;
+}
+
+body.admin-mode-active .artwork-desc-p {
+  outline: 1px dashed rgba(52, 152, 219, 0.3);
+  padding: 6px 10px;
+  border-radius: 4px;
+  min-height: 28px;
+}
+
+body.admin-mode-active .artwork-desc-p:hover,
+body.admin-mode-active .artwork-desc-p:focus {
+  outline-color: #3498db;
+  background-color: rgba(52, 152, 219, 0.04);
+}
+
+.admin-desc-delete-btn {
+  position: absolute;
+  right: -28px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: 14px;
+  line-height: 1;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+  z-index: 100;
+  opacity: 0.85;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.admin-desc-delete-btn:hover {
+  opacity: 1;
+  transform: translateY(-50%) scale(1.15);
+  background: #c0392b;
+}
+
+body.admin-mode-active .artwork-desc-p:hover .admin-desc-delete-btn,
+body.admin-mode-active .artwork-desc-p .admin-desc-delete-btn {
+  display: flex;
+}
+

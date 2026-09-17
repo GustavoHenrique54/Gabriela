@@ -187,10 +187,13 @@
   }
 
   // 2. Content Persistence
-  function getPageKey() {
+  function getPageName() {
     const path = window.location.pathname;
-    const page = path.substring(path.lastIndexOf('/') + 1) || 'index.html';
-    return STORAGE_PREFIX + "content_" + page;
+    return path.substring(path.lastIndexOf('/') + 1) || 'index.html';
+  }
+
+  function getPageKey() {
+    return STORAGE_PREFIX + "content_" + getPageName();
   }
 
   function applySavedContent() {
@@ -214,6 +217,35 @@
         document.head.appendChild(favLink);
       }
       favLink.href = savedFavicon;
+    }
+
+    // Restore artwork description paragraphs if any exist in storage
+    const pageName = getPageName();
+    const savedDescStr = safeStorage.getItem(STORAGE_PREFIX + "artwork_desc_" + pageName);
+    if (savedDescStr) {
+      try {
+        const savedParagraphs = JSON.parse(savedDescStr);
+        if (Array.isArray(savedParagraphs) && savedParagraphs.length > 0) {
+          const colLeft = document.querySelector(".column-left.text-content");
+          if (colLeft) {
+            let descContainer = colLeft.querySelector(".artwork-description");
+            if (!descContainer) {
+              descContainer = document.createElement("div");
+              descContainer.className = "artwork-description";
+              const allPs = Array.from(colLeft.querySelectorAll("p"));
+              const salesInquiry = allPs.find(p => p.innerHTML.includes("@") || p.innerHTML.includes("sales") || p.innerHTML.includes("contato"));
+              if (salesInquiry) {
+                colLeft.insertBefore(descContainer, salesInquiry);
+              } else {
+                colLeft.appendChild(descContainer);
+              }
+            }
+            descContainer.innerHTML = savedParagraphs.map(pText => `<p class="artwork-desc-p">${pText}</p>`).join("");
+          }
+        }
+      } catch (e) {
+        console.error("Erro ao restaurar descrição da obra:", e);
+      }
     }
 
     const pageKey = getPageKey();
@@ -334,9 +366,26 @@
     textSelectors.forEach(selector => {
       const elements = document.querySelectorAll(selector);
       if (elements.length > 0) {
-        textData[selector] = Array.from(elements).map(el => el.innerHTML);
+        textData[selector] = Array.from(elements).map(el => {
+          const clone = el.cloneNode(true);
+          clone.querySelectorAll(".admin-desc-delete-btn").forEach(b => b.remove());
+          return clone.innerHTML;
+        });
       }
     });
+
+    // Also save artwork description paragraphs explicitly
+    const descContainer = document.querySelector(".artwork-description");
+    if (descContainer) {
+      const descPs = Array.from(descContainer.querySelectorAll("p.artwork-desc-p, p")).map(p => {
+        const clone = p.cloneNode(true);
+        clone.querySelectorAll(".admin-desc-delete-btn").forEach(b => b.remove());
+        return clone.innerHTML.trim();
+      }).filter(t => t.length > 0);
+      safeStorage.setItem(STORAGE_PREFIX + "artwork_desc_" + getPageName(), JSON.stringify(descPs));
+    } else {
+      safeStorage.removeItem(STORAGE_PREFIX + "artwork_desc_" + getPageName());
+    }
 
     let success = safeStorage.setItem(pageKey, JSON.stringify(textData));
 
@@ -525,15 +574,18 @@
     
     const isWorkPage = window.location.pathname.endsWith("ttrabalhos.html");
     const isHomePage = window.location.pathname.endsWith("index.html") || window.location.pathname === "/" || window.location.pathname.endsWith("/");
+    const isDetailPage = !isWorkPage && !isHomePage && (!!document.querySelector(".column-left.text-content") || !!document.querySelector(".project-detail-layout"));
     
     const addPaintingBtnHtml = isWorkPage ? `<button id="adminAddPaintingBtn">Adicionar Obra</button>` : '';
     const homeBtnHtml = isHomePage ? `<button id="adminHomeConfigBtn">Personalizar Tela Inicial</button>` : '';
+    const addParagraphBtnHtml = isDetailPage ? `<button id="adminAddParagraphBtn">+ Parágrafo de Descrição</button>` : '';
 
     toolbar.innerHTML = `
       <h4><span>●</span> Editor Gabriela de Souza</h4>
       <div class="btn-group">
         ${homeBtnHtml}
         ${addPaintingBtnHtml}
+        ${addParagraphBtnHtml}
         <button id="adminDesignBtn">Personalizar Cores/Fontes</button>
         <button class="accent-btn" id="adminSaveGhBtn">Salvar no GitHub</button>
         <button class="danger-btn" id="adminLogoutBtn">Sair</button>
@@ -553,6 +605,12 @@
     if (isHomePage) {
       document.getElementById("adminHomeConfigBtn").addEventListener("click", showHomeConfigModal);
     }
+    if (isDetailPage) {
+      const addParaBtn = document.getElementById("adminAddParagraphBtn");
+      if (addParaBtn) {
+        addParaBtn.addEventListener("click", showAddParagraphModal);
+      }
+    }
   }
 
   function toggleEditMode(forceState) {
@@ -563,6 +621,7 @@
       makeTextsEditable(true);
       makeImagesClickable(true);
       showGridDeletes(true);
+      updateParagraphControls(true);
       document.getElementById("adminLockBtn").style.backgroundColor = "#3498db";
       document.getElementById("adminLockBtn").querySelector("svg").style.fill = "#fff";
       
@@ -574,6 +633,7 @@
       makeTextsEditable(false);
       makeImagesClickable(false);
       showGridDeletes(false);
+      updateParagraphControls(false);
       document.getElementById("adminLockBtn").style.backgroundColor = "";
       document.getElementById("adminLockBtn").querySelector("svg").style.fill = "";
       saveCurrentPageContent();
@@ -589,13 +649,177 @@
     
     textSelectors.forEach(selector => {
       document.querySelectorAll(selector).forEach(el => {
-        if (!el.closest("#adminToolbar") && !el.closest("#adminLockBtn") && !el.closest("#topNav") && !el.closest("#mobileNav")) {
+        if (!el.closest("#adminToolbar") && !el.closest("#adminLockBtn") && !el.closest("#topNav") && !el.closest("#mobileNav") && !el.closest(".admin-desc-actions") && !el.classList.contains("admin-desc-delete-btn")) {
           el.contentEditable = enable ? "true" : "false";
           if (enable) {
             el.addEventListener("blur", saveCurrentPageContent);
           }
         }
       });
+    });
+  }
+
+  function updateParagraphControls(show) {
+    const colLeft = document.querySelector(".column-left.text-content");
+    if (!colLeft) return;
+
+    // 1. Inline "+ Adicionar Parágrafo de Texto" button
+    let actionsContainer = colLeft.querySelector(".admin-desc-actions");
+    if (show) {
+      if (!actionsContainer) {
+        actionsContainer = document.createElement("div");
+        actionsContainer.className = "admin-desc-actions";
+        actionsContainer.innerHTML = `
+          <button type="button" class="admin-inline-btn" id="inlineAddParagraphBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Adicionar Parágrafo de Texto
+          </button>
+        `;
+
+        const descContainer = colLeft.querySelector(".artwork-description");
+        if (descContainer && descContainer.nextSibling) {
+          colLeft.insertBefore(actionsContainer, descContainer.nextSibling);
+        } else {
+          const allPs = Array.from(colLeft.querySelectorAll("p"));
+          const salesInquiry = allPs.find(p => p.innerHTML.includes("@") || p.innerHTML.includes("sales") || p.innerHTML.includes("contato"));
+          if (salesInquiry) {
+            colLeft.insertBefore(actionsContainer, salesInquiry);
+          } else {
+            colLeft.appendChild(actionsContainer);
+          }
+        }
+
+        const inlineBtn = actionsContainer.querySelector("#inlineAddParagraphBtn");
+        if (inlineBtn) {
+          inlineBtn.addEventListener("click", showAddParagraphModal);
+        }
+      }
+      actionsContainer.style.display = "block";
+    } else {
+      if (actionsContainer) {
+        actionsContainer.style.display = "none";
+      }
+    }
+
+    // 2. Delete buttons on each description paragraph
+    const descContainer = colLeft.querySelector(".artwork-description");
+    if (descContainer) {
+      const paragraphs = descContainer.querySelectorAll("p");
+      paragraphs.forEach(p => {
+        p.classList.add("artwork-desc-p");
+        let delBtn = p.querySelector(".admin-desc-delete-btn");
+        if (show) {
+          if (!delBtn) {
+            delBtn = document.createElement("button");
+            delBtn.className = "admin-desc-delete-btn";
+            delBtn.setAttribute("contenteditable", "false");
+            delBtn.setAttribute("title", "Excluir este parágrafo");
+            delBtn.innerHTML = "&times;";
+            delBtn.onclick = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (confirm("Deseja realmente excluir este parágrafo de texto?")) {
+                p.remove();
+                if (descContainer.querySelectorAll("p").length === 0) {
+                  descContainer.remove();
+                }
+                saveCurrentPageContent();
+              }
+            };
+            p.appendChild(delBtn);
+          }
+          delBtn.style.display = "flex";
+        } else {
+          if (delBtn) {
+            delBtn.remove();
+          }
+        }
+      });
+    }
+  }
+
+  function addParagraphToDOM(text) {
+    const colLeft = document.querySelector(".column-left.text-content");
+    if (!colLeft) return;
+
+    let descContainer = colLeft.querySelector(".artwork-description");
+    if (!descContainer) {
+      descContainer = document.createElement("div");
+      descContainer.className = "artwork-description";
+      const actions = colLeft.querySelector(".admin-desc-actions");
+      if (actions) {
+        colLeft.insertBefore(descContainer, actions);
+      } else {
+        const allPs = Array.from(colLeft.querySelectorAll("p"));
+        const salesInquiry = allPs.find(p => p.innerHTML.includes("@") || p.innerHTML.includes("sales") || p.innerHTML.includes("contato"));
+        if (salesInquiry) {
+          colLeft.insertBefore(descContainer, salesInquiry);
+        } else {
+          colLeft.appendChild(descContainer);
+        }
+      }
+    }
+
+    const p = document.createElement("p");
+    p.className = "artwork-desc-p";
+    p.innerHTML = text || "Novo parágrafo de texto da obra...";
+    if (isEditMode) {
+      p.contentEditable = "true";
+      p.addEventListener("blur", saveCurrentPageContent);
+    }
+    descContainer.appendChild(p);
+
+    if (isEditMode) {
+      updateParagraphControls(true);
+      p.focus();
+    }
+    saveCurrentPageContent();
+  }
+
+  function showAddParagraphModal() {
+    removeModals();
+    const backdrop = document.createElement("div");
+    backdrop.className = "admin-modal-backdrop";
+    backdrop.id = "adminAddParagraphModal";
+    backdrop.innerHTML = `
+      <div class="admin-modal" style="max-width: 540px;">
+        <div class="admin-modal-header">
+          <h3>Adicionar Parágrafo(s) à Obra</h3>
+          <span style="cursor:pointer; font-size: 20px;" onclick="document.getElementById('adminAddParagraphModal').remove()">&times;</span>
+        </div>
+        <div class="admin-modal-body">
+          <div class="admin-setting-item">
+            <label>Texto da Descrição</label>
+            <textarea id="adminNewParagraphText" rows="6" placeholder="Digite ou cole aqui o texto. Cada quebra de linha (Enter) criará um novo parágrafo separado..." style="border: 1px solid #3c3c3c; background-color: #3c3c3c; color: #fff; border-radius: 4px; padding: 10px; font-size: 13px; width: 100%; font-family: inherit; resize: vertical;"></textarea>
+          </div>
+        </div>
+        <div class="admin-modal-footer">
+          <button onclick="document.getElementById('adminAddParagraphModal').remove()">Cancelar</button>
+          <button id="adminAddEmptyParagraph" style="background-color: #444; border-color: #555;">+ Parágrafo Vazio</button>
+          <button class="primary-btn" id="adminSubmitNewParagraph">Adicionar à Obra</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(backdrop);
+    setTimeout(() => backdrop.classList.add("open"), 10);
+
+    document.getElementById("adminAddEmptyParagraph").addEventListener("click", () => {
+      addParagraphToDOM("Clique aqui para digitar o texto deste parágrafo...");
+      backdrop.remove();
+    });
+
+    document.getElementById("adminSubmitNewParagraph").addEventListener("click", () => {
+      const textVal = document.getElementById("adminNewParagraphText").value.trim();
+      if (!textVal) {
+        alert("Por favor, digite algum texto ou clique em '+ Parágrafo Vazio'.");
+        return;
+      }
+      const paragraphs = textVal.split(/\n+/).map(p => p.trim()).filter(p => p.length > 0);
+      paragraphs.forEach(pText => {
+        addParagraphToDOM(pText);
+      });
+      backdrop.remove();
     });
   }
 
@@ -921,6 +1145,10 @@
             <input type="text" id="newArtSize" placeholder="Ex: 50 x 70 cm">
           </div>
           <div class="admin-setting-item">
+            <label>Texto Descritivo / Parágrafos (opcional)</label>
+            <textarea id="newArtDescription" placeholder="Escreva a descrição da obra. Use quebras de linha para separar parágrafos..." style="width: 100%; height: 90px; background: #222; color: #fff; border: 1px solid #3c3c3c; border-radius: 4px; padding: 8px; font-family: inherit; font-size: 13px; box-sizing: border-box; resize: vertical;"></textarea>
+          </div>
+          <div class="admin-setting-item">
             <label>URL da Imagem da Obra</label>
             <input type="text" id="newArtImgUrl" placeholder="Cole o link da imagem...">
           </div>
@@ -956,6 +1184,7 @@
       const year = document.getElementById("newArtYear").value;
       const medium = document.getElementById("newArtMedium").value;
       const size = document.getElementById("newArtSize").value;
+      const descText = (document.getElementById("newArtDescription") ? document.getElementById("newArtDescription").value : "").trim();
       const urlInput = document.getElementById("newArtImgUrl").value;
       const imgSrc = loadedBase64 || urlInput;
 
@@ -972,6 +1201,7 @@
         year: year,
         medium: medium,
         size: size,
+        description: descText,
         imgSrc: imgSrc,
         url: newPageUrl
       };
@@ -979,6 +1209,13 @@
       const currentList = getCustomPaintings();
       currentList.push(newArtObj);
       safeStorage.setItem(STORAGE_PREFIX + "custom_paintings", JSON.stringify(currentList));
+
+      if (descText) {
+        const paragraphs = descText.split(/\n+/).map(p => p.trim()).filter(p => p.length > 0);
+        if (paragraphs.length > 0) {
+          safeStorage.setItem(STORAGE_PREFIX + "artwork_desc_" + newPageUrl, JSON.stringify(paragraphs));
+        }
+      }
 
       const detailPageData = {
         "h2": [title],
@@ -1280,6 +1517,12 @@
     });
     
     doc.querySelectorAll(".item-actions").forEach(a => a.remove());
+    doc.querySelectorAll(".admin-desc-actions").forEach(a => a.remove());
+    doc.querySelectorAll(".admin-desc-delete-btn").forEach(b => b.remove());
+    doc.querySelectorAll(".admin-inline-btn").forEach(b => b.remove());
+    doc.querySelectorAll(".artwork-description").forEach(desc => {
+      if (!desc.textContent.trim()) desc.remove();
+    });
 
     // Re-add admin.js script so the editor button persists after save
     const adminScript = doc.createElement("script");
@@ -1299,6 +1542,10 @@
     const sidebar = doc.getElementById("adminSidebar"); if (sidebar) sidebar.remove();
     const loadingOverlay = doc.getElementById("adminLoadingOverlay"); if (loadingOverlay) loadingOverlay.remove();
 
+    doc.querySelectorAll(".admin-desc-actions").forEach(a => a.remove());
+    doc.querySelectorAll(".admin-desc-delete-btn").forEach(b => b.remove());
+    doc.querySelectorAll(".admin-inline-btn").forEach(b => b.remove());
+
     const styleTag = doc.createElement("style");
     let cssVars = "";
     Object.keys(designVariables).forEach(variable => {
@@ -1310,6 +1557,32 @@
     if (cssVars) {
       styleTag.innerHTML = `:root { ${cssVars} }`;
       doc.head.appendChild(styleTag);
+    }
+
+    // Restore description paragraphs if any
+    const savedDescData = safeStorage.getItem(STORAGE_PREFIX + "artwork_desc_" + page);
+    if (savedDescData) {
+      try {
+        const paragraphs = JSON.parse(savedDescData);
+        if (Array.isArray(paragraphs) && paragraphs.length > 0) {
+          const colLeft = doc.querySelector(".twocol-layout.project-detail-layout .column-left.text-content") || doc.querySelector(".column-left.text-content");
+          if (colLeft) {
+            let descContainer = colLeft.querySelector(".artwork-description");
+            if (!descContainer) {
+              descContainer = doc.createElement("div");
+              descContainer.className = "artwork-description";
+              const allPs = Array.from(colLeft.querySelectorAll("p"));
+              const salesInquiry = allPs.find(p => p.innerHTML.includes("@") || p.innerHTML.includes("sales") || p.innerHTML.includes("contato"));
+              if (salesInquiry) {
+                colLeft.insertBefore(descContainer, salesInquiry);
+              } else {
+                colLeft.appendChild(descContainer);
+              }
+            }
+            descContainer.innerHTML = paragraphs.map(p => `<p class="artwork-desc-p">${p}</p>`).join("\n");
+          }
+        }
+      } catch (e) {}
     }
 
     const savedTextData = safeStorage.getItem(STORAGE_PREFIX + "content_" + page);
@@ -1454,7 +1727,7 @@
           <h2>${art.title}</h2>
           <p>${art.year || ''}</p>
           <p style="font-style: italic;">${art.medium || ''}</p>
-          <p>${art.size || ''}</p>
+          <p>${art.size || ''}</p>${art.description ? `\n          <div class="artwork-description">\n` + art.description.split(/\n+/).map(p => p.trim()).filter(p => p.length > 0).map(p => `            <p class="artwork-desc-p">${p}</p>`).join('\n') + `\n          </div>` : ''}
         </div>
         <div class="column-right column-image">
           <figure>
